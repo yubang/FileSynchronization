@@ -8,7 +8,7 @@
 
 from threading import Thread
 from config import server,base
-import os,ftplib,time,sqlite3,logging
+import os,ftplib,time,sqlite3,logging,re
 import pyinotify,shutil
 
 
@@ -36,7 +36,19 @@ class SendWorker(Thread):
     "文件传送类"
     def __moveSuccessUploadFile(self,filePath):
         "移动上传成功的文件"
-        pass
+        oldPath=filePath
+        filePath=filePath.replace(base.monitorPath,"")
+        if filePath[0] != "/":
+            filePath="/"+filePath
+        targetFile=base.move_dir+filePath
+        targetDir=os.path.dirname(targetFile)
+        if not os.path.exists(targetDir):
+            os.makedirs(targetDir)
+        try:
+            shutil.move(oldPath,targetFile)
+            logging.info(u"文件%s -> %s 移动成功！"%(oldPath,targetFile))
+        except:
+            logging.error(u"文件%s -> %s 移动失败！"%(oldPath,targetFile))
     def __handle(self,filePath):
         "处理要上传的文件"
         result=True
@@ -54,6 +66,8 @@ class SendWorker(Thread):
     def __getRemotePath(self,filePath,remotePath):
         "获取远程服务器文件存放路径"
         filePath=filePath.replace(base.monitorPath,"")
+        if filePath[0] != "/":
+            filePath="/"+filePath
         filePath=remotePath+filePath
         filePath=os.path.dirname(filePath)
         return filePath
@@ -92,22 +106,33 @@ class SendWorker(Thread):
         while True:
             fps=executeSql("select * from files where status = 0 limit 1",True)
             if len(fps) == 0:
-                time.sleep(3)
+                time.sleep(1.5)
             else:
                 try:
                     self.__handle(fps[0][0])
                 except Exception,e:
+                    #raise
                     logging.error(str(e))
+                    time.sleep(1.5)
                 executeSql("update files set status = 1 where path = '%s'"%(fps[0][0]),True)
 
 
 class MyEventHandler(pyinotify.ProcessEvent):
     "监控处理类"
+    def __checkAbleFile(self,filename):
+        "检测文件是否需要转移"
+        for r in base.able_lists:
+            if re.search("\."+r+"$",filename):
+                return True
+        return False
     def process_IN_CLOSE_WRITE(self, event):
         filePath=os.path.join(event.path,event.name)
-        logging.info(u"检测到创建文件:"+filePath)
-        executeSql("insert into files(path,status) values('%s',0)"%sqlDeal(filePath),False)
-
+        if self.__checkAbleFile(event.name):
+            logging.info(u"检测到要上传文件:"+filePath)
+            executeSql("insert into files(path,status) values('%s',0)"%sqlDeal(filePath),False)
+        else:
+            logging.warning(u"检测到不符合规则文件:%s"%(filePath))
+            
 def init():
     "初始化"
     executeSql("create table if not exists files(path varchar(255),status int(1))",False)

@@ -13,6 +13,6 @@ able_lists=[
 ]
 
 #上传完成后是否需要移动
-move_able = True
+move_able = False
 #上传完成后要移动到的目录（请确保可以写）
-move_dir = "/tmp/"
+move_dir = "/tmp"
