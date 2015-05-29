@@ -54,7 +54,7 @@ class SendWorker(Thread):
         result=True
         for obj in server.serverLists:
             remotePath=self.__getRemotePath(filePath,obj['data']['ftpRootPrefix'])
-            r=self.__sendFileUseFtp("127.0.0.1","21","FTP","FTP",filePath,remotePath)
+            r=self.__sendFileUseFtp(obj['data']['ftpHost'],obj['data']['ftpPort'],obj['data']['ftpUser'],obj['data']['ftpPassword'],filePath,remotePath)
             if not r:
                 result = False
                 logging.error(u"文件（%s）上传服务器（%s）失败！"%(filePath,obj['data']['ftpHost']))
